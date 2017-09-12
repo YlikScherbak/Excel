@@ -15,7 +15,7 @@
 </head>
 <body>
 
-
+@include('excel.navbar')
 
 <div class="container">
     <div class="row">
@@ -34,7 +34,7 @@
                                 <span class="custom-file-control"></span>
                             </label>
                         </div>
-                        <button type="submit" class="btn btn-default">Отправить</button>
+                        <button type="submit" class="btn btn-success">Отправить</button>
                     </form>
 
                 </div>

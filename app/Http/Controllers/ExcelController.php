@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use DB;
 use Illuminate\Http\Request;
 use Excel;
 use Storage;
@@ -19,7 +20,7 @@ class ExcelController extends Controller
 
     public function index()
     {
-        return view('excel');
+        return view('excel.excel');
     }
 
     public function getExcel(Request $request)
@@ -47,11 +48,11 @@ class ExcelController extends Controller
             $counter = 0;
             $lenght = count($value);
             foreach ($value as $v) {
-                if (is_null($v)){
+                if (is_null($v)) {
                     $counter++;
                 }
             }
-            return ($counter > ($lenght / 2 )) ? false : true;
+            return ($counter > ($lenght / 2)) ? false : true;
         });
 
         $data = json_encode($excel);
@@ -60,55 +61,106 @@ class ExcelController extends Controller
 
         session(['file_name' => $fileName, 'columns' => $this->arrayAlias[$highestColumn]]);
 
-        return view('excel_table', ['data' => array_slice($excel, 0, 15)]);
+        $manufacturer = DB::select('SELECT DISTINCT (manufacturer) FROM s_variants WHERE manufacturer IS NOT NULL ORDER BY manufacturer');
+        $currency = DB::select("SELECT code FROM s_currencies WHERE manufacturer = ''");
+
+        return view('excel.excel_table',
+            ['data' => array_slice($excel, 0, 15), 'manufacturer' => $manufacturer, 'currency' => $currency]);
     }
 
 
     public function updateExcel(Request $request)
     {
-
-//        $max = session('columns');
-
-    // TODO Нужно подумать нужна ли здесь валидация. Или же передалать предыдущий метод. Т.к. при обратном возвращение весь код отработает снова.
-//        $this->validate($request, [
-//            'articul' => 'required|min:0|max:' . $max,
-//            'price' => 'required|min:0|max:' . $max,
-//            'currency_default' => 'required_without:currency',
-//            'currency' => 'required_without:currency_default',
-//        ],[
-//            'articul.required' => 'Поле артикула должно быть заполнено',
-//            'price.required' => 'Поле цены должно быть заполнено',
-//            'currency_default.required_without' => 'Поле валюто должно быть заполнено, если вы не указываете тип валюты',
-//            'currency.required_without' => 'Поле тип валюты должно быть заполнено, если вы не указываете столбец с валютой'
-//        ]);
-
+//        dump($request);
 
         $excel = json_decode(Storage::disk('excel')->get(session('file_name')));
 
         $articul = $request->get('articul');
         $price = $request->get('price');
-        $currency = is_null($request->get('currency')) ? $request->get('currency_default') : $request->get('currency');
+        $currency = $this->getCurrency($request->get('currency'), $request->get('manufacturer'));
+        $manufacturer = $request->get('manufacturer');
 
+        $id = [];
 
+//        var_dump($excel);
+        //Проверка каждой строки и выборка id для последуешего запроса
         foreach ($excel as $v) {
-            if ($this->checkRow($v, $articul, $price, $currency)) {
-                var_dump('update hren(a) where articul=' . $v[$articul] . ' set(' . $v[$price] . ')');
+            if ($this->checkRow($v, $articul, $price)) {
+                $id[strval($v[$articul])] = $v[$price];
             }
         }
+
+        $tableRow = [];
+
+        if (is_null($manufacturer) || $manufacturer === '---') {
+            $tableRow = DB::table('s_variants')->whereIn('sku', array_keys($id))
+                ->get();
+        } else {
+            $tableRow = DB::table('s_variants')->whereIn('sku', array_keys($id))
+                ->where('manufacturer', '=', $request->get('manufacturer'))
+                ->get();
+        }
+
+
+//        foreach ($tableRow->all() as $row){
+//            var_dump($row);
+//            DB::table('s_variants')
+//                ->where('sku', strval($row->sku))
+//                ->update(['price' => (strval($id[$row->sku]) * $currency)]);
+//        }
+
         Storage::disk('excel')->delete(session('file_name'));
         $request->session()->forget(['file_name', 'columns']);
+
+
+
+        return view('excel.result',['result' => 'Заебись', 'excelRow' => count($id), 'tableRow' => $tableRow->count()]);
+    }
+
+
+
+    public function dbtest()
+    {
+
+        $curr = DB::table('s_variants')->where('sku', '=', '14521020-004')->get();
+
+        var_dump($curr);
 
     }
 
 
-    //Проверка отработа вроде нормально на обоих екселинах. Осталось подумать что бы ищё добавить
-    private function checkRow($row, $articul,$price, $currency){
-        if (is_null($row[$articul])){
+    private function checkRow($row, $articul, $price)
+    {
+        if (is_null($row[$articul])) {
             return false;
-        } elseif (is_null($row[$price]) || !is_numeric($row[$price])){
+        } elseif (is_null($row[$price]) || !is_numeric($row[$price])) {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Выбор валюты
+     * Если валюта не указана или UAH то возвращаеться 1.
+     * Если указан производитель для которого зарезервирован собственный тип валюты возвращаеться текущий курс по производителю.
+     * В остальных случаях возвращаеть стандартный курс валюты.
+     * @param $currency
+     * @param $manufacturer
+     * @return int
+     */
+    private function getCurrency($currency, $manufacturer)
+    {
+
+        $curr = DB::select("SELECT rate_to FROM s_currencies WHERE manufacturer = ?", [$manufacturer]);
+        if (empty($curr)) {
+            if ($currency === 'UAH' || is_null($currency)) {
+                return 1;
+            } else {
+                return DB::select("SELECT rate_to FROM s_currencies WHERE code = ? LIMIT 1", [$currency])[0]->rate_to;
+            }
+        }
+
+        return $curr[0]->rate_to;
     }
 }
 

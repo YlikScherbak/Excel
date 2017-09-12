@@ -15,10 +15,12 @@
 </head>
 <body>
 
+@include('excel.navbar')
+
 <div class="container">
     <div class="row">
         @if (count($errors) > 0)
-            <div class = "alert alert-danger">
+            <div class="alert alert-danger">
                 <ul>
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
@@ -29,20 +31,36 @@
         <form class="form-inline" method="post" action="{{ route('update_excel') }}">
             {{ csrf_field() }}
             <div class="form-group">
-                <label for="email">Артикул:</label>
-                <input type="number" name="articul" class="form-control" id="articul" autofocus required min="0" max="{{ session('columns') -1 }}">
+                <label for="articul">Артикул:</label>
+                <input type="number" name="articul" class="form-control" id="articul" autofocus required min="0"
+                       max="{{ session('columns') -1 }}">
             </div>
             <div class="form-group">
-                <label for="pwd">Цена:</label>
-                <input type="number" name="price" class="form-control" id="price" autofocus required min="0" max="{{ session('columns') -1 }}">
+                <label for="price">Цена:</label>
+                <input type="number" name="price" class="form-control" id="price" autofocus required min="0"
+                       max="{{ session('columns') -1 }}">
             </div>
-            <div class="form-group">
-                <label for="pwd">Валюта:</label>
-                <input type="number" name="currency_default" class="form-control" id="currency_default"  min="0" max="{{ session('columns') -1 }}">
+            <div class="form-control">
+                <label for="manufacturer">Производитель:</label>
+                <select name="manufacturer" id="manufacturer">
+                    @foreach($manufacturer as $man)
+                        <option value="{{ $man->manufacturer }}">{{ $man->manufacturer }}</option>
+                    @endforeach
+                </select>
             </div>
-            <div class="form-group">
-                <label for="pwd">Тип валюты:</label>
-                <input type="text" name="currency" class="form-control" id="currency">
+            <div class="form-control">
+                <label for="currency">Валюта:</label>
+                <select name="currency" id="currency">
+                    <option value=""></option>
+                    @foreach($currency as $cur)
+                        <option value="{{ $cur->code }}">{{ $cur->code }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="checkbox">
+                <label>
+                    <input type="checkbox" name="old" value="true"> Учитывать скидку
+                </label>
             </div>
             <button type="submit" class="btn btn-default">Отправить</button>
         </form>
@@ -75,8 +93,6 @@
         </div>
     </div>
 </div>
-
-
 
 
 <script>
