@@ -30,40 +30,50 @@
         @endif
         <form class="form form-inline form-multiline" method="post" action="{{ route('preview_excel') }}">
             {{ csrf_field() }}
-            <div class="form-group">
-                <label for="articul">Артикул:</label>
-                <input type="number" name="articul" class="form-control" id="articul" autofocus required min="0"
-                       max="{{ session('columns') -1 }}">
+            <div class="form-group col-md-3">
+                <div class="input-group margin_top_10 ">
+                    <span class=" i-text-info input-group-addon">Артикул</span>
+                    <input type="number" name="articul" class="form-control" id="articul" autofocus required min="0"
+                           max="{{ session('columns') -1 }}">
+                </div>
             </div>
-            <div class="form-group">
-                <label for="price">Цена:</label>
-                <input type="number" name="price" class="form-control" id="price" autofocus required min="0"
-                       max="{{ session('columns') -1 }}">
+            <div class="form-group col-md-3">
+                <div class="input-group margin_top_10 ">
+                    <span class=" i-text-info input-group-addon">Цена</span>
+                    <input type="number" name="price" class="form-control" id="price" autofocus required min="0"
+                           max="{{ session('columns') -1 }}">
+                </div>
             </div>
-            <div class="form-control form-group">
-                <label for="manufacturer">Производитель:</label>
-                <select name="manufacturer" id="manufacturer" required>
-                    <option selected disabled>Выбрать</option>
-                    @foreach($manufacturer as $man)
-                        <option value="{{ $man->manufacturer }}">{{ $man->manufacturer }}</option>
-                    @endforeach
-                </select>
+            <div class=" form-group col-md-3">
+                <div class="input-group margin_top_10 ">
+                <span class=" i-text-info input-group-addon">Поставщик</span>
+                    <select class="form-control" name="manufacturer" id="manufacturer" required>
+                        <option selected disabled>Выбрать</option>
+                        @foreach($manufacturer as $man)
+                            <option value="{{ $man->manufacturer }}">{{ $man->manufacturer }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="currency_col">Столбец Валюты</label>
-                <input type="number" name="currency_col" class="form-control" id="currency_col" autofocus min="0"
-                       max="{{ session('columns') -1 }}">
+            <div class="form-group col-md-3">
+                <div class="input-group margin_top_10 ">
+                    <span class=" i-text-info input-group-addon">Столбец Валюты</span>
+                    <input type="number" name="currency_col" class="form-control" id="currency_col" autofocus min="0"
+                           max="{{ session('columns') -1 }}">
+                </div>
             </div>
-            <div class="form-control form-group">
-                <label for="currency">Валюта:</label>
-                <select name="currency" id="currency">
-                    <option selected disabled>Выбрать</option>
-                    @foreach($currency as $cur)
-                        <option value="{{ $cur->id }}">{{ $cur->code . ' '  . $cur->manufacturer}}</option>
-                    @endforeach
-                </select>
+            <div class="form-group  col-md-3">
+                <div class="input-group margin_top_10 ">
+                    <span class=" i-text-info input-group-addon">Валюта</span>
+                    <select class="form-control" name="currency" id="currency">
+                        <option selected disabled>Выбрать</option>
+                        @foreach($currency as $cur)
+                            <option value="{{ $cur->id }}">{{ $cur->code . ' '  . $cur->manufacturer}}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
-            <div class="form-group checkbox">
+            <div class="form-group checkbox  col-md-3">
                 <label>
                     <input type="checkbox" name="old" value="true"> Учитывать скидку
                 </label>
