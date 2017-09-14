@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\ExcelData;
 use DB;
 use Illuminate\Http\Request;
 use Excel;
+use Illuminate\Support\Collection;
+use Session;
 use Storage;
 
 class ExcelController extends Controller
@@ -21,6 +24,10 @@ class ExcelController extends Controller
     public function index()
     {
         return view('excel.excel');
+    }
+
+    public function info() {
+        return view('excel.info');
     }
 
     public function getExcel(Request $request)
@@ -62,72 +69,153 @@ class ExcelController extends Controller
         session(['file_name' => $fileName, 'columns' => $this->arrayAlias[$highestColumn]]);
 
         $manufacturer = DB::select('SELECT DISTINCT (manufacturer) FROM s_variants WHERE manufacturer IS NOT NULL ORDER BY manufacturer');
-        $currency = DB::select("SELECT code FROM s_currencies WHERE manufacturer = ''");
+        $currency = DB::select("SELECT id, code, manufacturer FROM s_currencies");
 
         return view('excel.excel_table',
             ['data' => array_slice($excel, 0, 15), 'manufacturer' => $manufacturer, 'currency' => $currency]);
     }
 
 
-    public function updateExcel(Request $request)
+    public function previewExcel(Request $request)
     {
-//        dump($request);
 
         $excel = json_decode(Storage::disk('excel')->get(session('file_name')));
 
         $articul = $request->get('articul');
         $price = $request->get('price');
-        $currency = $this->getCurrency($request->get('currency'), $request->get('manufacturer'));
         $manufacturer = $request->get('manufacturer');
+        $currency = $request->get('currency');
+        $currencyCol = $request->get('currency_col');
 
-        $id = [];
+        if ($request->get('old')) {
+            session(['old' => true]);
+        } else {
+            session(['old' => false]);
+        }
 
-//        var_dump($excel);
-        //Проверка каждой строки и выборка id для последуешего запроса
-        foreach ($excel as $v) {
-            if ($this->checkRow($v, $articul, $price)) {
-                $id[strval($v[$articul])] = $v[$price];
+        $error = false;
+
+        $currency_responce = '';
+
+        if (!is_null($currency) && is_null($currencyCol)) {
+            $code = DB::table('s_currencies')->where('id', '=', $currency)->get()->first()->code;
+            $currency_responce = 'Валюта : ' . $code;
+        } elseif (!is_null($currencyCol) && is_null($currency)) {
+            $currency_responce = 'Тип валюты указан в столбце ' . $currencyCol;
+        } elseif (is_null($currency) && is_null($currencyCol)) {
+            $currency = DB::table('s_currencies')->where('code', '=', 'UAH')->get()->first()->id;
+            $currency_responce = 'Вы не указали валюту. Поэтому будет выбрана гривна.';
+        } elseif (!is_null($currency) && !is_null($currencyCol)) {
+            $currency_responce = 'Ошибка. Вы указали столбец и тип валюты. Выберите что то одно.';
+            $error = true;
+        }
+
+        $collection = new Collection();
+
+        $currencies = $this->getAllCurrencies();
+        $currencies['грн'] = DB::table('s_currencies')->where('code', '=', 'UAH')->get()->first()->id;
+
+        //Создание коллекции всех записей екселины
+        if (!is_null($currency)) {
+            foreach ($excel as $v) {
+                if ($this->checkRow($v, $articul, $price)) {
+                    $collection->push(new ExcelData($v[$articul], $v[$price], $manufacturer, $currency));
+                }
+            }
+        } elseif (!is_null($currencyCol)) {
+            foreach ($excel as $v) {
+                if ($this->checkRow($v, $articul, $price)) {
+                    $collection->push(new ExcelData($v[$articul], $v[$price], $manufacturer, $v[$currencyCol]));
+                }
             }
         }
 
         $tableRow = [];
 
-        if (is_null($manufacturer) || $manufacturer === '---') {
-            $tableRow = DB::table('s_variants')->whereIn('sku', array_keys($id))
-                ->get();
-        } else {
-            $tableRow = DB::table('s_variants')->whereIn('sku', array_keys($id))
-                ->where('manufacturer', '=', $request->get('manufacturer'))
-                ->get();
+        $id = $collection->map(function ($e) {
+            return $e->sku;
+        })->all();
+
+        //Выбока с базы всех совпадений
+        $tableRow = DB::table('s_variants')->whereIn('sku', $id)
+            ->where('manufacturer', '=', $manufacturer)
+            ->get();
+
+        //Фильтрация коллекции только по совпадающим артикулам
+        $rowSku = $tableRow->map(function ($row) {
+            return $row->sku;
+        })->all();
+
+        $collection = $collection->filter(function ($data) use ($rowSku) {
+            return in_array($data->sku, $rowSku);
+        });
+
+        //Устанавливаю валюту в зависимоти от той которая указана в колонке
+        if (!is_null($currencyCol) && is_null($currency)) {
+            foreach ($collection as $col) {
+                $col->currency_id = $currencies[$col->currency_id];
+            }
         }
 
+        Session::put('excel_data', $collection);
 
-//        foreach ($tableRow->all() as $row){
-//            var_dump($row);
-//            DB::table('s_variants')
-//                ->where('sku', strval($row->sku))
-//                ->update(['price' => (strval($id[$row->sku]) * $currency)]);
-//        }
-
-        Storage::disk('excel')->delete(session('file_name'));
-        $request->session()->forget(['file_name', 'columns']);
-
-
-
-        return view('excel.result',['result' => 'Заебись', 'excelRow' => count($id), 'tableRow' => $tableRow->count()]);
+        return view('excel.preview', ['error' => $error, 'excelRow' => count($id), 'tableRow' => $tableRow->count(),
+            'currency' => $currency_responce, 'manufacturer' => $manufacturer]);
     }
 
 
+    public function updateExcel()
+    {
+        $data = Session::get('excel_data');
+
+        if (session('old')) {
+            foreach ($data->all() as $row) {
+                $oldPrice = DB::table('s_variants')
+                    ->where([['sku', '=', $row->sku], ['manufacturer', '=', $row->manufacturer]])
+                    ->get()->first()->price;
+                if ($oldPrice < $row->price) {
+                    DB::table('s_variants')
+                        ->where([['sku', '=', $row->sku], ['manufacturer', '=', $row->manufacturer]])
+                        ->update([
+                            'price' => $row->price,
+                            'currency' => $row->currency_id,
+                            'compare_price' => $oldPrice
+                        ]);
+                } else {
+                    $this->update($data);
+                }
+            }
+        } else {
+            $this->update($data);
+        }
+
+        Storage::disk('excel')->delete(session('file_name'));
+        Session::flush();
+
+        return redirect(route('index_excel'))->with('message', 'Обновление БД завершено');
+    }
+
+    public function cancel()
+    {
+        Storage::disk('excel')->delete(session('file_name'));
+        Session::flush();
+        return redirect(route('index_excel'));
+    }
 
     public function dbtest()
     {
-
-        $curr = DB::table('s_variants')->where('sku', '=', '14521020-004')->get();
-
-        var_dump($curr);
-
     }
 
+    private function update($data) {
+        foreach ($data->all() as $row) {
+            DB::table('s_variants')
+                ->where([['sku', '=', $row->sku], ['manufacturer', '=', $row->manufacturer]])
+                ->update([
+                    'price' => $row->price,
+                    'currency' => $row->currency_id
+                ]);
+        }
+    }
 
     private function checkRow($row, $articul, $price)
     {
@@ -139,29 +227,19 @@ class ExcelController extends Controller
         return true;
     }
 
-    /**
-     * Выбор валюты
-     * Если валюта не указана или UAH то возвращаеться 1.
-     * Если указан производитель для которого зарезервирован собственный тип валюты возвращаеться текущий курс по производителю.
-     * В остальных случаях возвращаеть стандартный курс валюты.
-     * @param $currency
-     * @param $manufacturer
-     * @return int
-     */
-    private function getCurrency($currency, $manufacturer)
+    private function checkPriceDifference($tableRow, $collection)
     {
 
-        $curr = DB::select("SELECT rate_to FROM s_currencies WHERE manufacturer = ?", [$manufacturer]);
-        if (empty($curr)) {
-            if ($currency === 'UAH' || is_null($currency)) {
-                return 1;
-            } else {
-                return DB::select("SELECT rate_to FROM s_currencies WHERE code = ? LIMIT 1", [$currency])[0]->rate_to;
-            }
-        }
-
-        return $curr[0]->rate_to;
     }
+
+    private function getAllCurrencies()
+    {
+        $currencies = DB::table('s_currencies')->where('manufacturer', '=', '')->get();
+        return array_reduce($currencies->map(function ($e) {
+            return array($e->code => $e->id);
+        })->all(), 'array_merge', array());
+    }
+
 }
 
 

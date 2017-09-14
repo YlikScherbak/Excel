@@ -17,9 +17,15 @@
 
 @include('excel.navbar')
 
+
 <div class="container">
     <div class="row">
         <div class="col-md-6 col-md-offset-3">
+            @if(Session::has('message'))
+                <span class="help-block">
+                                        <strong>{{ Session::get('message') }}</strong>
+                                    </span>
+            @endif
             <div class="panel panel-default" style="margin-top:45px">
                 <div class="panel-heading">
                     <h3 class="panel-title">Выберите excel файл</h3>
@@ -39,6 +45,11 @@
 
                 </div>
             </div>
+                <div class="error-actions">
+                    <a href="{{ route('info') }}" class="btn btn-primary btn-lg"><span
+                                class="glyphicon glyphicon-info-sign"></span>
+                        Инструкция :) </a>
+                </div>
         </div>
     </div>
 </div>

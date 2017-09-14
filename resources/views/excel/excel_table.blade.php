@@ -28,7 +28,7 @@
                 </ul>
             </div>
         @endif
-        <form class="form-inline" method="post" action="{{ route('update_excel') }}">
+        <form class="form form-inline form-multiline" method="post" action="{{ route('preview_excel') }}">
             {{ csrf_field() }}
             <div class="form-group">
                 <label for="articul">Артикул:</label>
@@ -40,29 +40,37 @@
                 <input type="number" name="price" class="form-control" id="price" autofocus required min="0"
                        max="{{ session('columns') -1 }}">
             </div>
-            <div class="form-control">
+            <div class="form-control form-group">
                 <label for="manufacturer">Производитель:</label>
-                <select name="manufacturer" id="manufacturer">
+                <select name="manufacturer" id="manufacturer" required>
+                    <option selected disabled>Выбрать</option>
                     @foreach($manufacturer as $man)
                         <option value="{{ $man->manufacturer }}">{{ $man->manufacturer }}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="form-control">
+            <div class="form-group">
+                <label for="currency_col">Столбец Валюты</label>
+                <input type="number" name="currency_col" class="form-control" id="currency_col" autofocus min="0"
+                       max="{{ session('columns') -1 }}">
+            </div>
+            <div class="form-control form-group">
                 <label for="currency">Валюта:</label>
                 <select name="currency" id="currency">
-                    <option value=""></option>
+                    <option selected disabled>Выбрать</option>
                     @foreach($currency as $cur)
-                        <option value="{{ $cur->code }}">{{ $cur->code }}</option>
+                        <option value="{{ $cur->id }}">{{ $cur->code . ' '  . $cur->manufacturer}}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="checkbox">
+            <div class="form-group checkbox">
                 <label>
                     <input type="checkbox" name="old" value="true"> Учитывать скидку
                 </label>
             </div>
-            <button type="submit" class="btn btn-default">Отправить</button>
+            <div class="form-group">
+                <button type="submit" class="btn btn-default btn-success">Отправить</button>
+            </div>
         </form>
     </div>
 </div>
