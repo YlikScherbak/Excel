@@ -31,10 +31,11 @@
                                     </span>
                     @endif
 
-                    <h2>Количество полей в excel: {{ $excelRow }}</h2>
-                    <h2>Количество найденых совпадений в БД: {{ $tableRow }}</h2>
-                    <h2>Производитель: {{ $manufacturer }}</h2>
-                    <h2>Данные по валюте: {{ $currency }}</h2>
+                    <h3>Количество полей в excel: {{ $excelRow }}</h3>
+                    <h3>Количество найденых совпадений в БД: {{ $tableRow }}</h3>
+                    <h3>Производитель: {{ $manufacturer }}</h3>
+                    <h3>Данные по валюте: {{ $currency }}</h3>
+                    <h3>Коэфициент надбавки: {{ $surcharge }}</h3>
                     <div class="btn-group btn-group-justified">
                         <a href="{{ route('cancel_update') }}" class="btn btn-danger">Отменить</a>
                         @if(!$error)

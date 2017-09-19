@@ -86,6 +86,9 @@ class ExcelController extends Controller
         $manufacturer = $request->get('manufacturer');
         $currency = $request->get('currency');
         $currencyCol = $request->get('currency_col');
+        $surcharge = is_null($request->get('surcharge')) ? 1 : ($request->get('surcharge') / 100 + 1);
+
+        Session::put('surcharge', $surcharge);
 
         if ($request->get('old')) {
             session(['old' => true]);
@@ -160,33 +163,24 @@ class ExcelController extends Controller
         Session::put('excel_data', $collection);
 
         return view('excel.preview', ['error' => $error, 'excelRow' => count($id), 'tableRow' => $tableRow->count(),
-            'currency' => $currency_responce, 'manufacturer' => $manufacturer]);
+            'currency' => $currency_responce, 'manufacturer' => $manufacturer, 'surcharge' => $surcharge]);
     }
 
 
+    /**
+     * Обновление БД.
+     * @return \Illuminate\Http\RedirectResponse
+     */
     public function updateExcel()
     {
         $data = Session::get('excel_data');
 
+        $surcharge = Session::get('surcharge');
+
         if (session('old')) {
-            foreach ($data->all() as $row) {
-                $oldPrice = DB::table('s_variants')
-                    ->where([['sku', '=', $row->sku], ['manufacturer', '=', $row->manufacturer]])
-                    ->get()->first()->price;
-                if ($oldPrice < $row->price) {
-                    DB::table('s_variants')
-                        ->where([['sku', '=', $row->sku], ['manufacturer', '=', $row->manufacturer]])
-                        ->update([
-                            'price' => $row->price,
-                            'currency' => $row->currency_id,
-                            'compare_price' => $oldPrice
-                        ]);
-                } else {
-                    $this->update($data);
-                }
-            }
+            $this->updateWithOld($data, $surcharge);
         } else {
-            $this->update($data);
+            $this->update($data, $surcharge);
         }
 
         Storage::disk('excel')->delete(session('file_name'));
@@ -195,6 +189,11 @@ class ExcelController extends Controller
         return redirect(route('index_excel'))->with('message', 'Обновление БД завершено');
     }
 
+    /**
+     * Отменна обновления БД. Файл з данными удаляеться, а сессия очищаеться.
+     * Редирект на начальную страницу.
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
+     */
     public function cancel()
     {
         Storage::disk('excel')->delete(session('file_name'));
@@ -206,17 +205,56 @@ class ExcelController extends Controller
     {
     }
 
-    private function update($data) {
+
+    /**
+     * Обновление БД без учета старой цены
+     * @param $data - Collection of ExcelData
+     * @param $surcharge - float
+     */
+    private function update($data, $surcharge) {
         foreach ($data->all() as $row) {
             DB::table('s_variants')
                 ->where([['sku', '=', $row->sku], ['manufacturer', '=', $row->manufacturer]])
                 ->update([
-                    'price' => $row->price,
+                    'price' => $row->price * $surcharge,
                     'currency' => $row->currency_id
                 ]);
         }
     }
 
+    /**
+     * Обновление БД с учетом старой цены. Если старая цена меньше, то она записываеться в compare_price
+     * @param $data - Collection of ExcelData
+     * @param $surcharge - float
+     */
+    private function updateWithOld($data, $surcharge) {
+
+        foreach ($data->all() as $row) {
+            $oldPrice = DB::table('s_variants')
+                ->where([['sku', '=', $row->sku], ['manufacturer', '=', $row->manufacturer]])
+                ->get()->first()->price;
+            if ($oldPrice < $row->price) {
+                DB::table('s_variants')
+                    ->where([['sku', '=', $row->sku], ['manufacturer', '=', $row->manufacturer]])
+                    ->update([
+                        'price' => $row->price * $surcharge,
+                        'currency' => $row->currency_id,
+                        'compare_price' => $oldPrice
+                    ]);
+            } else {
+                $this->update($data, $surcharge);
+            }
+        }
+
+    }
+
+    /**
+     *
+     * @param $row - Строка записи из экселя
+     * @param $articul - позиция артикула в массиве
+     * @param $price - позиция цены в массиве
+     * @return bool
+     */
     private function checkRow($row, $articul, $price)
     {
         if (is_null($row[$articul])) {
@@ -232,6 +270,10 @@ class ExcelController extends Controller
 
     }
 
+    /**
+     * Функция берёт из БД все записи по валюте и возвращает массив
+     * @return mixed
+     */
     private function getAllCurrencies()
     {
         $currencies = DB::table('s_currencies')->where('manufacturer', '=', '')->get();

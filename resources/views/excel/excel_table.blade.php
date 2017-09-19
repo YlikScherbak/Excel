@@ -73,7 +73,13 @@
                     </select>
                 </div>
             </div>
-            <div class="form-group checkbox  col-md-3">
+            <div class="form-group col-md-2">
+                <div class="input-group margin_top_10 ">
+                    <span class=" i-text-info input-group-addon">Надбавка</span>
+                    <input type="number" name="surcharge" class="form-control" id="surcharge" autofocus>
+                </div>
+            </div>
+            <div class="form-group checkbox  col-md-2">
                 <label>
                     <input type="checkbox" name="old" value="true"> Учитывать скидку
                 </label>
