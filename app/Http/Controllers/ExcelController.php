@@ -213,11 +213,11 @@ class ExcelController extends Controller
      */
     private function update($data, $surcharge) {
         foreach ($data->all() as $row) {
-            DB::table('s_variants')
-                ->where([['sku', '=', $row->sku], ['manufacturer', '=', $row->manufacturer]])
-                ->update([
-                    'price' => $row->price * $surcharge,
-                    'currency' => $row->currency_id
+           $req =  DB::table('s_variants')
+                ->where([['sku', '=', (string) $row->sku], ['manufacturer', '=', $row->manufacturer]]);
+                $req->update([
+                    'price' =>  (integer)$row->price * (integer) $surcharge,
+                    'currency' => (integer)$row->currency_id
                 ]);
         }
     }
